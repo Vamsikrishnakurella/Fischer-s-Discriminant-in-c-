@@ -1,0 +1,293 @@
+#include <iostream>
+#include <fstream>
+#include <stdlib.h>
+#include <string>
+#include <string.h>
+#include <math.h>
+#include "linearAlgebra.hpp"
+
+//struct to store the vectors and class that it belongs to
+//present in train.txt
+struct pattern
+{
+    double** v;
+    int c;
+};
+
+//struct to store the final output values of the model i.e.
+//vector w and threshold value w0
+struct parameters
+{
+	double** w;
+	double y0;
+};
+
+//struct
+struct nt
+{
+    double r;
+    int c;
+};
+
+//sizes of the training and test set
+//const int N = 4;
+const int N = 960;
+const int M = 412;
+
+//compare function for sort
+int compare(const void* a, const void* b)
+{
+    struct nt* t1 = (struct nt*)a;
+    struct nt* t2 = (struct nt*)b;
+
+    return (t1->r > t2->r)? -1:1;
+}
+
+//function to read files and extract data from files
+struct pattern* readData(char* f1)
+{
+    struct pattern* pat = new pattern[1000];
+
+    for(int i=0; i<N; i++)
+    {
+    	pat[i].v = matrixCreate(4, 1);
+    }
+
+    //opening the file and reading the file line by line
+    std::string line;
+    std::ifstream myfile(f1);
+    if(myfile.is_open())
+    {
+        int cnt = 0;
+        while(std::getline(myfile, line))
+        {
+            //In each line the 4 co-ordinates and class is copied to
+            //patterns struct array
+            int len = line.length();
+            int str = 0, count = 0;
+            for(int i=0; i<len; i++)
+            {
+                if(line[i] == ',' || i == len-1)
+                {
+                	if(i != len-1)
+                    	line[i] = '\0';
+                    if(count < 4)
+                    {
+                        pat[cnt].v[count][0] = atof(&line[str]);
+                    }
+                    else
+                    {
+                        pat[cnt].c = atoi(&line[str]);
+                    }
+                    count++;
+                    str = i+1;
+                }
+            }
+            cnt++;
+        }
+        myfile.close();
+    }
+    else std::cout << "Unable to open file\n";
+
+    //function returns the struct array that contains
+    //4 co-ordinates and the class
+    return pat;
+}
+
+//function to train our gaussian model
+struct parameters* trainAlgo(struct pattern* pat)
+{
+    //defining variables
+    double** m1 = matrixCreate(4, 1);
+    double** m2 = matrixCreate(4, 1);
+    double** Sw1 = matrixCreate(4, 4);
+    double** Sw2 = matrixCreate(4, 4);
+    int N1 = 0, N2 = 0;
+
+    //initializing to zero
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<1; j++)
+        {
+            m1[i][j] = 0.0;
+            m2[i][j] = 0.0;
+        }
+    }
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<4; j++)
+        {
+            Sw1[i][j] = 0.0;
+            Sw2[i][j] = 0.0;
+        }
+    }
+
+    //finding the means
+	for(int i=0; i<N; i++)
+    {
+        if(pat[i].c == 0)
+        {
+            m2 = matrixAdd(m2, pat[i].v, 4, 1);
+            N2++;
+        }
+        else
+        {
+            m1 = matrixAdd(m1, pat[i].v, 4, 1);
+            N1++;
+        }
+    }
+    m1 = matrixMult((1.0/N1), m1, 4, 1);
+    m2 = matrixMult((1.0/N2), m2, 4, 1);
+
+    //finding the matrix Sw
+    for(int i=0; i<N; i++)
+    {
+        if(pat[i].c == 0)
+        {
+            double** temp1 = matrixMult(-1.0, m2, 4, 1);
+            double** temp2 = matrixAdd(pat[i].v, temp1, 4, 1);
+            double** temp3 = matrixTranspose(temp2, 4, 1);
+            double** temp4 = matrixMult(temp2, 4, 1, temp3, 1, 4);
+            Sw2 = matrixAdd(Sw2, temp4, 4, 4);
+        }
+        else
+        {
+            double** temp1 = matrixMult(-1.0, m1, 4, 1);
+            double** temp2 = matrixAdd(pat[i].v, temp1, 4, 1);
+            double** temp3 = matrixTranspose(temp2, 4, 1);
+            double** temp4 = matrixMult(temp2, 4, 1, temp3, 1, 4);
+            Sw1 = matrixAdd(Sw1, temp4, 4, 4);
+        }
+    }
+    //finding vector w and normalizing it
+    double** Sw = matrixAdd(Sw1, Sw2, 4, 4);
+    matrixInverse(Sw, 4);
+    double** temp1 = matrixMult(-1.0, m2, 4, 1);
+    double** temp2 = matrixAdd(m1, temp1, 4, 1);
+    double** w = matrixMult(Sw, 4, 4, temp2, 4, 1);
+    //w = matrixMult(1.0/matrixMagnitude(w, 4, 1), w, 4, 1);
+    double** w_t = matrixTranspose(w, 4, 1);
+
+    //matrixPrint(Sw, 4, 4);
+
+    //finding the threshold value y0
+    struct nt* arr = new struct nt[N];
+    for(int i=0; i<N; i++)
+    {
+        double** temp = matrixMult(w_t, 1, 4, pat[i].v, 4, 1);
+        arr[i].r = temp[0][0];
+        arr[i].c = pat[i].c;
+    }
+
+    qsort(arr, N, sizeof(arr[0]), compare);
+
+    double f = 0.0, minf = (arr[0].r+arr[1].r)/2, emin = 1000;
+    double e = 0.0;
+    int index = 0;
+    for(int i=1; i<N-2; i++)
+    {
+        f = (arr[i].r + arr[i+1].r)/2;
+        int n1 = 0, n2 = 0, n3 = 0, n4 = 0;
+        for(int j = 0; j<N; j++)
+        {
+            if(arr[j].r > f)
+            {
+                if(arr[j].c == 0)
+                    n1++;
+                else
+                    n2++;
+            }
+            else
+            {
+                if(arr[j].c == 0)
+                    n3++;
+                else
+                    n4++;
+            }
+        }
+        double q1 = (n1 == 0)?0.0:(1.0*n1/(n1+n2))*(log(1.0*n1/(n1+n2)))/log(2);
+        double q2 = (n2 == 0)?0.0:(1.0*n2/(n1+n2))*(log(1.0*n2/(n1+n2)))/log(2);
+        double q3 = (n3 == 0)?0.0:(1.0*n3/(n3+n4))*(log(1.0*n3/(n3+n4)))/log(2);
+        double q4 = (n4 == 0)?0.0:(1.0*n4/(n3+n4))*(log(1.0*n4/(n3+n4)))/log(2);
+        //e = (1.0*(n1+n2)/(n1+n2+n3+n4))*(-1)*(q1+q2) + (1.0*(n3+n4)/(n1+n2+n3+n4))*(-1)*(q3+q4);
+        e = (-1)*(q1+q2) + (-1)*(q3+q4);
+        if(e < emin)
+        {
+            emin = e;
+            minf = f;
+            index = i;
+        }
+    }
+    struct parameters* par = new parameters;
+    par->w = w;
+    par->y0 = minf;
+
+    return par;
+}
+
+//function to test the model that has been trained
+void testAlgo(struct parameters* par, struct pattern* pat)
+{
+	double w0 = par->y0;
+	double** w_t = matrixTranspose(par->w, 4, 1);
+	int a=0, b=0, c=0, d=0;
+
+	for(int i=0; i<M; i++)
+	{
+		double** temp = matrixMult(w_t, 1, 4, pat[i].v, 4, 1);
+		int temp1 = (temp[0][0] > par->y0)? 1:0 ;
+		if(pat[i].c == temp1)
+		{
+			if(temp1 == 0)
+				a++;
+			else
+				d++;
+		}
+		else
+		{
+			if(temp1 == 0)
+				c++;
+			else
+				b++;
+		}
+	}
+
+	std::cout << "_______CONFUSION MATRIX________\n";
+	std::cout << "          |negative |positive \n";
+	std::cout << "negative  |"<<a<<"      |"<<b<<"\n" ;
+	std::cout << "positive  |"<<c<<"        |"<<d<<"\n";
+	std::cout << "_______________________________\n";
+	std::cout << "Recall     : " << (double)d/(d+c) << std::endl;
+	std::cout << "Precision  : " << (double)d/(b+d) << std::endl;
+
+}
+
+int main()
+{
+	char f1[50];
+	char f2[50];
+	strcpy(f1, "train.txt");
+	strcpy(f2, "test.txt");
+
+	//obtaining patterns from train.txt
+	struct pattern* pat1 = readData(f1);
+	//obtaining parameters from the extracated data
+	struct parameters* par = trainAlgo(pat1);
+	//obtaining patterns from test.txt
+	struct pattern* pat2 = readData(f2);
+
+	std::cout << "Vector w: [ ";
+	for(int i=0; i<4; i++)
+	{
+		for(int j=0; j<1; j++)
+		{
+			std::cout << par->w[i][j] << " ";
+		}
+	}
+	std::cout << "]\n";
+	std::cout << "threshold value w0: " << par->y0 << std::endl;
+
+	testAlgo(par, pat2);
+
+	return 0;
+}

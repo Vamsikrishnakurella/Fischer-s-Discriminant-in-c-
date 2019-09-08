@@ -1,0 +1,21 @@
+#ifndef _LIN_ALG_
+#define _LIN_ALG_
+
+//function to spare some memory to create a matrix
+double** matrixCreate(int, int);
+//function to invert a matrix
+int matrixInverse(double**, int);
+//function to print a matrix
+void matrixPrint(double**, int, int);
+//function to add two matrices
+double** matrixAdd(double**, double**, int, int);
+//function overloaded: 1. multiplying real number and matrix
+//					   2. multiplying two matrices
+double** matrixMult(double, double**, int, int);
+double** matrixMult(double**, int, int, double**, int, int);
+//function to transpose matrices
+double** matrixTranspose(double**, int, int);
+//function to find sum of squares
+double matrixMagnitude(double**, int, int);
+
+#endif

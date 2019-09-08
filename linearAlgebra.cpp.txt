@@ -1,0 +1,200 @@
+#include <math.h>
+#include <iostream>
+
+//function to compare two doubles
+int nearlyEqual(double a, double b)
+{
+	double diff = fabs(a-b);
+	return (diff < 0.00000001)? 1:0;
+}
+
+//printing a matrix
+void matrixPrint(double** arr, int n, int m)
+{
+	for(int i=0; i<n; i++)
+	{
+		for(int j=0; j<m; j++)
+		{
+			std::cout << arr[i][j] << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
+//inverting a matrix
+int matrixInverse(double** ar, int n)
+{
+	int count = 0;
+	double** inv = new double*[n];
+	for(int i=0; i<n; i++)
+	{
+		inv[i] = new double[n];
+	}
+
+	for(int i=0; i<n; i++)
+	{
+		for(int j=0; j<n; j++)
+		{
+			if(i==j)
+				inv[i][j] = 1.0;
+			else
+				inv[i][j] = 0.0;
+		}
+	}
+
+	//Gauss-Jordan Elimination
+	for(int i=0; i<n; i++)
+	{
+		int q = i;
+		while(q<n && nearlyEqual(ar[q][i], 0.0))
+			q++;
+
+		if(q>=n)
+		{
+			count = -1;
+			break;
+		}
+
+		double temp;
+		for(int j=0; j<n; j++)
+		{
+			temp = ar[i][j];
+			ar[i][j] = ar[q][j];
+			ar[q][j] = temp;
+			temp = inv[i][j];
+			inv[i][j] = inv[q][j];
+			inv[q][j] = temp;
+		}
+
+		double scale = ar[i][i];
+		for(int k=0; k<n; k++)
+		{
+			ar[i][k] = ar[i][k]/scale;
+			inv[i][k] = inv[i][k]/scale;
+		}
+		for(int j=0; j<n; j++)
+		{
+			if(i != j)
+			{
+				double ar_s = ar[j][i];
+				double inv_s = ar[j][i];
+				for(int k=0; k<n; k++)
+				{
+					ar[j][k] = ar[j][k] - ar_s*ar[i][k];
+					inv[j][k] = inv[j][k] - inv_s*inv[i][k];
+				}
+			}
+		}
+	}
+
+	for(int i=0; i<n; i++)
+	{
+		for(int j=0; j<n; j++)
+		{
+			ar[i][j] = inv[i][j];
+		}
+	}
+
+	for(int i=0; i<n; i++)
+	{
+		delete[] inv[i];
+	}
+	delete[] inv;
+
+	return count;
+}
+
+//creating a matrix
+double** matrixCreate(int n, int m)
+{
+	double** mat = new double*[n];
+	for(int i=0; i<n; i++)
+	{
+		mat[i] = new double[m];
+	}
+
+	return mat;
+}
+
+//ading two matrices
+double** matrixAdd(double** b, double** c, int n, int m)
+{
+	double** a = matrixCreate(n, m);
+
+	for(int i=0; i<n; i++)
+	{
+		for(int j=0; j<m; j++)
+		{
+			a[i][j] = b[i][j] + c[i][j];
+		}
+	}
+
+	return a;
+}
+
+//multiplying a real number and a matrix
+double** matrixMult(double x, double** a, int n, int m)
+{
+	double** b = matrixCreate(n, m);
+
+	for(int i=0; i<n; i++)
+	{
+		for(int j=0; j<m; j++)
+		{
+			b[i][j] = a[i][j]*x;
+		}
+	}
+
+	return b;
+}
+
+//multiplying two matrices
+double** matrixMult(double** b, int n2, int m2, double** c, int n3, int m3)
+{
+	double** a = matrixCreate(n2, m3);
+
+	for(int i=0; i<n2; i++)
+	{
+		for(int j=0; j<m3; j++)
+		{
+			a[i][j] = 0;
+			for(int k=0; k<m2; k++)
+			{
+				a[i][j] = a[i][j] + b[i][k]*c[k][j];
+			}
+		}
+	}
+	return a;
+}
+
+//transposing a matrix
+double** matrixTranspose(double** a, int n, int m)
+{
+	double** b = matrixCreate(m, n);
+
+	for(int i=0; i<m; i++)
+	{
+		for(int j=0; j<n; j++)
+		{
+			b[i][j] = a[j][i];
+		}
+	}
+	return b;
+}
+
+//square sum
+double matrixMagnitude(double** a, int n, int m)
+{
+    double sum = 0.0;
+
+    for(int i=0; i<n; i++)
+    {
+        for(int j=0; j<m; j++)
+        {
+            sum = sum + a[i][j]*a[i][j];
+        }
+    }
+    sum = sqrt(sum);
+
+    return sum;
+}
